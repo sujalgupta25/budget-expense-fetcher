@@ -1,67 +1,87 @@
-# Install necessary libraries
-!pip install streamlit requests pandas
-
 import streamlit as st
 import requests
 from requests.auth import HTTPBasicAuth
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
+import calendar
+import io
 
-# --- API Config ---
-API_URL = "http://trifapi.volac.in/api/BudgetExpenses/get"
-USERNAME = "API"
-PASSWORD = "7MW6t"
-
-# --- UI: Date Inputs ---
-st.title("📅 Budget Expense Fetcher")
-
-from_date = st.date_input("Select From Date", datetime.today().replace(day=1))
-to_date = st.date_input("Select To Date", datetime.today())
-
-# --- Helper to generate month/year pairs ---
-@st.cache_data
-def get_month_year_range(start_date, end_date):
-    months = []
-    current = start_date.replace(day=1)
-    while current <= end_date:
-        months.append({"month": current.month, "year": current.year})
-        next_month = current.replace(day=28) + timedelta(days=4)  # ensures next month
-        current = next_month.replace(day=1)
-    return months
-
-# --- Fetch data ---
-if st.button("Fetch Data"):
-    if from_date > to_date:
-        st.error("❌ 'From Date' cannot be after 'To Date'")
-    else:
-        months_years = get_month_year_range(from_date, to_date)
-        all_data = []
-
-        with st.spinner("Fetching data..."):
-            for item in months_years:
-                response = requests.get(
-                    API_URL,
-                    params={"month": item["month"], "year": item["year"]},
-                    auth=HTTPBasicAuth(USERNAME, PASSWORD)
-                )
-                if response.status_code == 200:
-                    try:
-                        data = response.json()
-                        if isinstance(data, list):
-                            all_data.extend(data)
-                            st.success(f"Fetched {len(data)} records for {item['month']}/{item['year']}")
-                        else:
-                            st.warning(f"No data returned for {item['month']}/{item['year']}")
-                    except ValueError:
-                        st.error(f"Failed to parse data for {item['month']}/{item['year']}")
-                else:
-                    st.error(f"API call failed for {item['month']}/{item['year']}")
-
-        # --- Show data ---
-        if all_data:
-            df = pd.DataFrame(all_data)
-            st.dataframe(df)
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button("Download CSV", csv, "budget_expenses.csv", "text/csv")
+# Function to fetch data for a given month and year
+def fetch_data(month, year):
+    url = "http://trifapi.volac.in/api/BudgetExpenses/get"
+    
+    # Prepare the parameters
+    params = {
+        "month": month,  # e.g., 'Apr', 'Jan'
+        "year": str(year)  # Ensure it's a string
+    }
+    
+    # Make the API call
+    response = requests.get(url, params=params, auth=HTTPBasicAuth('API', '7MW6t%"+Vu'))
+    
+    # Handle the response
+    if response.status_code == 200:
+        data = response.json()
+        if data:
+            return pd.DataFrame(data)
         else:
-            st.info("No data retrieved in the selected range.")
+            st.warning(f"No data returned for {month}/{year}")
+            return None
+    else:
+        st.error(f"Failed to fetch data for {month}/{year}. Status Code: {response.status_code}")
+        st.text(f"Response Text: {response.text}")
+        return None
+
+# Streamlit app interface
+st.title("Budget Expense Fetcher")
+
+# Date input for selecting the date range
+start_date = st.date_input("Start Date", datetime.today())
+end_date = st.date_input("End Date", datetime.today())
+
+# Fetch months and years from the selected date range
+months = pd.date_range(start=start_date, end=end_date, freq='MS').strftime('%b')  # Month abbreviation
+years = pd.date_range(start=start_date, end=end_date, freq='MS').year
+
+# Display the selected range
+st.write(f"Fetching data for the period: {start_date} to {end_date}")
+
+# Button to trigger fetching data
+if st.button('Fetch Data'):
+    all_data = []
+    
+    # Loop through months and years in the selected range
+    for month, year in zip(months, years):
+        st.write(f"Fetching data for {month} {year}...")
+        
+        # Fetch data for the current month/year
+        df = fetch_data(month, year)
+        if df is not None:
+            all_data.append(df)
+    
+    # Combine all dataframes into one
+    if all_data:
+        final_df = pd.concat(all_data, ignore_index=True)
+        st.dataframe(final_df)  # Show data in table format
+        
+        # Excel download functionality
+        @st.cache_data  # Cache the result to avoid re-execution
+        def to_excel(df):
+            # Create an in-memory buffer for the Excel file
+            output = io.BytesIO()
+            # Write DataFrame to the buffer
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name="Budget Expenses")
+            output.seek(0)
+            return output
+
+        # Provide a download button
+        excel_file = to_excel(final_df)
+        st.download_button(
+            label="Download Excel",
+            data=excel_file,
+            file_name="budget_expenses.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        st.warning("No data available for the selected date range.")
