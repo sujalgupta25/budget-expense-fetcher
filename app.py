@@ -3,85 +3,143 @@ import requests
 from requests.auth import HTTPBasicAuth
 import pandas as pd
 from datetime import datetime
-import calendar
 import io
 
-# Function to fetch data for a given month and year
-def fetch_data(month, year):
+# Auth setup
+AUTH = HTTPBasicAuth('API', '7MW6t%"+Vu')
+
+# Mapping icons and module order
+MODULES = {
+    "Funding Agency": "🏛️",
+    "Project": "📁",
+    "Budget Head": "🧾",
+    "Sub Budget Head": "📑",
+    "Budget Expense": "💸",
+}
+
+# API Functions
+def fetch_budget_data(month, year):
     url = "http://trifapi.volac.in/api/BudgetExpenses/get"
-    
-    # Prepare the parameters
-    params = {
-        "month": month,  # e.g., 'Apr', 'Jan'
-        "year": str(year)  # Ensure it's a string
-    }
-    
-    # Make the API call
-    response = requests.get(url, params=params, auth=HTTPBasicAuth('API', '7MW6t%"+Vu'))
-    
-    # Handle the response
-    if response.status_code == 200:
-        data = response.json()
-        if data:
-            return pd.DataFrame(data)
-        else:
-            st.warning(f"No data returned for {month}/{year}")
-            return None
+    params = {"month": month, "year": str(year)}
+    res = requests.get(url, params=params, auth=AUTH)
+    if res.status_code == 200:
+        data = res.json()
+        return pd.DataFrame(data) if data else pd.DataFrame()
     else:
-        st.error(f"Failed to fetch data for {month}/{year}. Status Code: {response.status_code}")
-        st.text(f"Response Text: {response.text}")
-        return None
+        st.error(f"Budget data fetch failed for {month}/{year}")
+        return pd.DataFrame()
 
-# Streamlit app interface
-st.title("Budget Expense Fetcher")
+def fetch_funding_agency(date):
+    url = "http://trifapi.volac.in/api/MasFA/get/"
+    params = {"date": date.strftime('%Y-%m-%d')}
+    res = requests.get(url, params=params, auth=AUTH)
+    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
 
-# Date input for selecting the date range
+def fetch_project(date):
+    url = "http://trifapi.volac.in/api/MasPR/get/"
+    params = {"date": date.strftime('%Y-%m-%d')}
+    res = requests.get(url, params=params, auth=AUTH)
+    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+
+def fetch_budget_head(date):
+    url = "http://trifapi.volac.in/api/MasBudgetHead/GetAllMasBudgetHead/"
+    params = {"date": date.strftime('%Y-%m-%d')}
+    res = requests.get(url, params=params, auth=AUTH)
+    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+
+def fetch_sub_budget_head(date):
+    url = "http://trifapi.volac.in/api/MasSubBudgetHead/GetAllMasSubBudgetHead/"
+    params = {"date": date.strftime('%Y-%m-%d')}
+    res = requests.get(url, params=params, auth=AUTH)
+    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+
+# Excel Export
+def to_excel(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False)
+    output.seek(0)
+    return output
+
+# --- Streamlit UI ---
+st.set_page_config(page_title="Volac Data Fetcher", layout="wide")
+
+# Custom Styling
+st.markdown("""
+    <style>
+        body {
+            background-color: #f0f2f6;
+        }
+        .footer {
+            position: relative;
+            bottom: 0;
+            width: 100%;
+            margin-top: 40px;
+            text-align: center;
+            font-size: 14px;
+            color: gray;
+        }
+        .powered {
+            font-weight: bold;
+            color: #555;
+        }
+        .stButton>button {
+            background-color: #0066cc;
+            color: white;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Header
+st.title("📊 Volac Data Fetcher")
+st.markdown("Fetch real-time data from Volac APIs")
+
+# Inputs
+module = st.selectbox("Select Module", list(MODULES.keys()))
 start_date = st.date_input("Start Date", datetime.today())
 end_date = st.date_input("End Date", datetime.today())
 
-# Fetch months and years from the selected date range
-months = pd.date_range(start=start_date, end=end_date, freq='MS').strftime('%b')  # Month abbreviation
-years = pd.date_range(start=start_date, end=end_date, freq='MS').year
+# Fetch Button
+if st.button("📥 Fetch Data"):
+    with st.spinner("Fetching data..."):
+        df = pd.DataFrame()
 
-# Display the selected range
-st.write(f"Fetching data for the period: {start_date} to {end_date}")
+        if module == "Funding Agency":
+            df = fetch_funding_agency(start_date)
 
-# Button to trigger fetching data
-if st.button('Fetch Data'):
-    all_data = []
-    
-    # Loop through months and years in the selected range
-    for month, year in zip(months, years):
-        st.write(f"Fetching data for {month} {year}...")
-        
-        # Fetch data for the current month/year
-        df = fetch_data(month, year)
-        if df is not None:
-            all_data.append(df)
-    
-    # Combine all dataframes into one
-    if all_data:
-        final_df = pd.concat(all_data, ignore_index=True)
-        st.dataframe(final_df)  # Show data in table format
-        
-        # Excel download functionality
-        @st.cache_data  # Cache the result to avoid re-execution
-        def to_excel(df):
-            # Create an in-memory buffer for the Excel file
-            output = io.BytesIO()
-            # Write DataFrame to the buffer
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name="Budget Expenses")
-            output.seek(0)
-            return output
+        elif module == "Project":
+            df = fetch_project(start_date)
 
-        # Provide a download button
-        excel_file = to_excel(final_df)
-        st.download_button(
-            label="Download Excel",
-            data=excel_file,
-            file_name="budget_expenses.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    else:
-        st.warning("No data available for the selected date range.")
+        elif module == "Budget Head":
+            df = fetch_budget_head(start_date)
+
+        elif module == "Sub Budget Head":
+            df = fetch_sub_budget_head(start_date)
+
+        elif module == "Budget Expense":
+            months = pd.date_range(start=start_date, end=end_date, freq='MS').strftime('%b')
+            years = pd.date_range(start=start_date, end=end_date, freq='MS').year
+            all_data = [fetch_budget_data(m, y) for m, y in zip(months, years)]
+            df = pd.concat(all_data, ignore_index=True) if all_data else pd.DataFrame()
+
+        if not df.empty:
+            st.success(f"✅ Data fetched for {module}")
+            st.dataframe(df, use_container_width=True)
+
+            # Download button
+            st.download_button(
+                label="⬇️ Download Excel",
+                data=to_excel(df),
+                file_name=f"{module.lower().replace(' ', '_')}_data.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            st.warning("No data found for the selected inputs.")
+
+# Footer
+st.markdown("""
+<div class="footer">
+    <div class="powered">Powered by: Sujal Gupta</div>
+    <div>📧 Contact: sujal.gupta@dhwaniris.com | 📱 7300180072</div>
+</div>
+""", unsafe_allow_html=True)
