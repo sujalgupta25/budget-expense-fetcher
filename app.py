@@ -36,7 +36,7 @@ def fetch_funding_agency(date):
     return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
 
 def fetch_project(date):
-    url = "http://trifapi.volac.in/api/MasPR/get/"
+    url = "http://trifapi.volac.in/api/MasFAPR/GetAllMasFAPR/"
     params = {"date": date.strftime('%Y-%m-%d')}
     res = requests.get(url, params=params, auth=AUTH)
     return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
