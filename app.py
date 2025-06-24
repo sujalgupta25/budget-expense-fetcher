@@ -23,42 +23,56 @@ def fetch_budget_data(month, year):
     url = "http://trifapi.volac.in/api/BudgetExpenses/get"
     params = {"month": month, "year": str(year)}
     res = requests.get(url, params=params, auth=AUTH)
-    if res.status_code == 200:
-        data = res.json()
-        return pd.DataFrame(data) if data else pd.DataFrame()
-    else:
-        st.error(f"Budget data fetch failed for {month}/{year}")
-        return pd.DataFrame()
+    df = pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    if not df.empty:
+        df["API Month"] = month
+        df["API Year"] = year
+    return df
 
 def fetch_funding_agency(date):
     url = "http://trifapi.volac.in/api/MasFA/get/"
     params = {"date": date.strftime('%Y-%m-%d')}
     res = requests.get(url, params=params, auth=AUTH)
-    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    df = pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    if not df.empty:
+        df["API Date"] = date.strftime('%Y-%m-%d')
+    return df
 
 def fetch_project(date):
     url = "http://trifapi.volac.in/api/MasFAPR/GetAllMasFAPR/"
     params = {"date": date.strftime('%Y-%m-%d')}
     res = requests.get(url, params=params, auth=AUTH)
-    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    df = pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    if not df.empty:
+        df["API Date"] = date.strftime('%Y-%m-%d')
+    return df
 
 def fetch_budget_head(date):
     url = "http://trifapi.volac.in/api/MasBudgetHead/GetAllMasBudgetHead/"
     params = {"date": date.strftime('%Y-%m-%d')}
     res = requests.get(url, params=params, auth=AUTH)
-    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    df = pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    if not df.empty:
+        df["API Date"] = date.strftime('%Y-%m-%d')
+    return df
 
 def fetch_sub_budget_head(date):
     url = "http://trifapi.volac.in/api/MasSubBudgetHead/GetAllMasSubBudgetHead/"
     params = {"date": date.strftime('%Y-%m-%d')}
     res = requests.get(url, params=params, auth=AUTH)
-    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    df = pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    if not df.empty:
+        df["API Date"] = date.strftime('%Y-%m-%d')
+    return df
 
-def fetch_budget(date):  # New Budget API function
+def fetch_budget(date):
     url = "http://trifapi.volac.in/api/MasBU/get/"
     params = {"date": date.strftime('%Y-%m-%d')}
     res = requests.get(url, params=params, auth=AUTH)
-    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    df = pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+    if not df.empty:
+        df["API Date"] = date.strftime('%Y-%m-%d')
+    return df
 
 # Excel Export
 def to_excel(df):
