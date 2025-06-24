@@ -8,16 +8,17 @@ import io
 # Auth setup
 AUTH = HTTPBasicAuth('API', '7MW6t%"+Vu')
 
-# Mapping icons and module order
+# Mapping icons and module order (updated as per your request)
 MODULES = {
     "Funding Agency": "🏛️",
     "Project": "📁",
     "Budget Head": "🧾",
     "Sub Budget Head": "📑",
-    "Budget Expense": "💸",
+    "Budget": "📊",
+    "Budget Expense": "💸"
 }
 
-# API Functions
+# --- API Fetch Functions ---
 def fetch_budget_data(month, year):
     url = "http://trifapi.volac.in/api/BudgetExpenses/get"
     params = {"month": month, "year": str(year)}
@@ -49,6 +50,12 @@ def fetch_budget_head(date):
 
 def fetch_sub_budget_head(date):
     url = "http://trifapi.volac.in/api/MasSubBudgetHead/GetAllMasSubBudgetHead/"
+    params = {"date": date.strftime('%Y-%m-%d')}
+    res = requests.get(url, params=params, auth=AUTH)
+    return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
+
+def fetch_budget(date):  # New Budget API function
+    url = "http://trifapi.volac.in/api/MasBU/get/"
     params = {"date": date.strftime('%Y-%m-%d')}
     res = requests.get(url, params=params, auth=AUTH)
     return pd.DataFrame(res.json()) if res.status_code == 200 else pd.DataFrame()
@@ -115,6 +122,9 @@ if st.button("📥 Fetch Data"):
 
         elif module == "Sub Budget Head":
             df = fetch_sub_budget_head(start_date)
+
+        elif module == "Budget":
+            df = fetch_budget(start_date)
 
         elif module == "Budget Expense":
             months = pd.date_range(start=start_date, end=end_date, freq='MS').strftime('%b')
